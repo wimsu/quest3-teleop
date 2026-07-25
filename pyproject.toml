@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "quest3-teleop"
+version = "0.1.0"
+description = "Robot-independent Meta Quest 3 hand tracking over a USB ADB bridge"
+readme = "README.md"
+requires-python = ">=3.10"
+keywords = ["meta-quest", "hand-tracking", "teleoperation", "webxr", "robotics"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Operating System :: POSIX :: Linux",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Topic :: Scientific/Engineering",
+]
+dependencies = [
+  "aiohttp>=3.9,<4",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[project.scripts]
+quest3-teleop = "quest3_teleop.cli:main"
+
+[project.urls]
+Repository = "https://github.com/wimsu/quest3-teleop"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+quest3_teleop = ["web/*.html", "web/*.js"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
