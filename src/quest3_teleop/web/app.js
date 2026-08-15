@@ -15,7 +15,6 @@ let session = null;
 let referenceSpace = null;
 let gl = null;
 let sequence = 0;
-let lastSentMs = -Infinity;
 
 window.quest3TeleopState = {
   phase: "loading",
@@ -96,7 +95,7 @@ function onFrame(timeMs, frame) {
   gl.clearColor(0, 0, 0, 1);
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-  if (!socket || socket.readyState !== WebSocket.OPEN || timeMs - lastSentMs < 1000 / 60) return;
+  if (!socket || socket.readyState !== WebSocket.OPEN) return;
   const sources = { left: null, right: null };
   for (const source of activeSession.inputSources) {
     if (source.hand && (source.handedness === "left" || source.handedness === "right")) {
@@ -116,7 +115,6 @@ function onFrame(timeMs, frame) {
       right: packedHand(frame, sources.right),
     },
   }));
-  lastSentMs = timeMs;
 }
 
 async function startTracking() {

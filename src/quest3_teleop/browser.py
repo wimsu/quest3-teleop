@@ -306,10 +306,10 @@ class QuestBrowserAutomation:
         self,
         session: aiohttp.ClientSession,
         target: dict[str, Any],
-    ) -> tuple[bool, str, str]:
+    ) -> tuple[bool, str, str, bool]:
         websocket_url = target.get("webSocketDebuggerUrl")
         if not isinstance(websocket_url, str):
-            return False, "debugging websocket is unavailable"
+            return False, "debugging websocket is unavailable", "", False
         async with session.ws_connect(self._local_websocket_url(websocket_url)) as websocket:
             response = await self._command(
                 websocket,
@@ -325,6 +325,7 @@ class QuestBrowserAutomation:
                         "),"
                         "status:document.querySelector('#status')?.textContent||'',"
                         "phase:window.quest3TeleopState?.phase||'',"
+                        "visible:document.visibilityState==='visible',"
                         "clientLoaded:typeof window.quest3StartTracking==='function'"
                         "})"
                     ),
@@ -343,7 +344,29 @@ class QuestBrowserAutomation:
             bool(state.get("ready")),
             str(state.get("status", "")),
             str(state.get("phase", "")),
+            bool(state.get("visible", True)),
         )
+
+    async def _bring_page_to_front(
+        self,
+        session: aiohttp.ClientSession,
+        target: dict[str, Any],
+    ) -> None:
+        """Activate a ready teleop tab left hidden by a prior WebVR task."""
+
+        websocket_url = target.get("webSocketDebuggerUrl")
+        if not isinstance(websocket_url, str):
+            raise QuestBrowserError("Quest teleop page has no debugging websocket")
+        async with session.ws_connect(
+            self._local_websocket_url(websocket_url)
+        ) as websocket:
+            await self._command(
+                websocket,
+                command_id=4,
+                method="Page.bringToFront",
+                params={},
+                timeout_s=2.0,
+            )
 
     async def _tracking_state(
         self,
@@ -466,7 +489,9 @@ class QuestBrowserAutomation:
                     ]
                     for candidate in candidates:
                         try:
-                            ready, status, phase = await self._page_state(session, candidate)
+                            ready, status, phase, visible = await self._page_state(
+                                session, candidate
+                            )
                         except (aiohttp.ClientError, asyncio.TimeoutError, QuestBrowserError):
                             continue
                         last_status = status or last_status
@@ -474,9 +499,19 @@ class QuestBrowserAutomation:
                             ("Could not start:", "WebXR unavailable", "This browser")
                         ):
                             raise QuestBrowserError(status)
-                        if ready:
+                        if ready and visible:
                             target = candidate
                             break
+                        if ready:
+                            last_status = "bringing hidden Quest Browser page to front"
+                            try:
+                                await self._bring_page_to_front(session, candidate)
+                            except (
+                                aiohttp.ClientError,
+                                asyncio.TimeoutError,
+                                QuestBrowserError,
+                            ):
+                                pass
                     if target is not None:
                         break
                     await asyncio.sleep(0.1)
@@ -485,6 +520,10 @@ class QuestBrowserAutomation:
                         f"Quest teleop page was not ready before timeout ({last_status})"
                     )
 
+                # Quest Browser can report a ready DOM slightly before the
+                # WebVR panel becomes foreground-visible.  Calling
+                # requestSession() in that window is rejected by Horizon OS.
+                await asyncio.sleep(0.75)
                 await self._click_start(session, target)
                 # Starting a new Quest WebXR activity can re-apply the runtime's
                 # "not worn" suspend state. The USB owner reasserts its

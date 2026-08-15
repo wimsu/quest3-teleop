@@ -55,6 +55,7 @@ def test_receiver_serves_page_and_accepts_latest_frame() -> None:
                 assert '"immersive-vr"' in script
                 assert '"immersive-ar"' not in script
                 assert "framebufferScaleFactor: 0.25" in script
+                assert "lastSentMs" not in script
             async with session.get(f"http://127.0.0.1:{port}/health") as response:
                 health = await response.json()
                 assert health["transport"] == "usb"

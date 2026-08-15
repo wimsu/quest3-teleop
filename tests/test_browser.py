@@ -93,6 +93,87 @@ def test_start_page_uses_user_gesture_and_waits_for_frames() -> None:
     asyncio.run(scenario())
 
 
+def test_start_page_brings_ready_hidden_page_to_front() -> None:
+    async def scenario() -> None:
+        port = free_port()
+        page_url = f"http://127.0.0.1:{port}/teleop/"
+        state = {"accepted": 0, "visible": False, "brought_to_front": 0}
+
+        async def targets(_request: web.Request) -> web.Response:
+            return web.json_response(
+                [
+                    {
+                        "id": "hidden",
+                        "type": "page",
+                        "url": page_url,
+                        "webSocketDebuggerUrl": (
+                            f"ws://127.0.0.1:{port}/devtools/page/hidden"
+                        ),
+                    }
+                ]
+            )
+
+        async def page_socket(request: web.Request) -> web.WebSocketResponse:
+            websocket = web.WebSocketResponse()
+            await websocket.prepare(request)
+            async for message in websocket:
+                value = json.loads(message.data)
+                if value["method"] == "Page.bringToFront":
+                    state["visible"] = True
+                    state["brought_to_front"] += 1
+                    result: dict[str, object] = {}
+                elif value["params"].get("userGesture") is True:
+                    state["accepted"] = 1
+                    result = {
+                        "result": {
+                            "type": "string",
+                            "value": json.dumps(
+                                {"activated": True, "phase": "requesting_session"}
+                            ),
+                        }
+                    }
+                else:
+                    result = {
+                        "result": {
+                            "type": "string",
+                            "value": json.dumps(
+                                {
+                                    "ready": True,
+                                    "status": "Ready.",
+                                    "phase": "ready",
+                                    "visible": state["visible"],
+                                }
+                            ),
+                        }
+                    }
+                await websocket.send_json({"id": value["id"], "result": result})
+            return websocket
+
+        async def health(_request: web.Request) -> web.Response:
+            return web.json_response({"accepted": state["accepted"]})
+
+        app = web.Application()
+        app.router.add_get("/json/list", targets)
+        app.router.add_get("/devtools/page/hidden", page_socket)
+        app.router.add_get("/teleop/health", health)
+        runner = web.AppRunner(app)
+        await runner.setup()
+        await web.TCPSite(runner, "127.0.0.1", port).start()
+        try:
+            automation = QuestBrowserAutomation(debug_port=port)
+            result = await automation._start_page(  # noqa: SLF001
+                page_url,
+                after_session_request=None,
+                timeout_s=2.0,
+            )
+            assert result.accepted_frames == 1
+            assert state["brought_to_front"] == 1
+        finally:
+            await runner.cleanup()
+
+    asyncio.run(scenario())
+
+
 def test_navigate_page_replaces_cold_start_new_tab() -> None:
     async def scenario() -> None:
         port = free_port()
