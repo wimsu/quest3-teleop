@@ -12,8 +12,8 @@ repositories.
 
 ## Setup
 
-Requirements: Linux, Python 3.10+, Android `adb`, a USB data cable, and a
-developer-mode Quest 3.
+Requirements: Linux, Python 3.10+, a USB data cable, and a developer-mode
+Quest 3.
 
 ```bash
 git clone https://github.com/wimsu/quest3-teleop.git
@@ -21,13 +21,18 @@ cd quest3-teleop
 
 python3 -m venv .venv
 .venv/bin/python -m pip install -e .
-bash scripts/install_quest_udev_rule.sh
+bash scripts/authorize_quest.sh
 ```
 
-Reconnect the headset, accept its USB debugging prompt, and verify:
+The authorization command finds ADB, installs it automatically on Ubuntu or
+Debian when absent, configures Linux USB permissions, and waits for the Quest
+USB debugging prompt. Wake and unlock the headset, select **Always allow from
+this computer**, and accept the prompt.
+
+Run the same command to recover lost authorization:
 
 ```bash
-adb devices -l
+bash scripts/authorize_quest.sh
 ```
 
 `adb` may also be selected with `QUEST3_ADB`, `ANDROID_HOME`,
