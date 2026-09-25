@@ -35,6 +35,14 @@ Run the same command to recover lost authorization:
 bash scripts/authorize_quest.sh
 ```
 
+If ADB remains `unauthorized` and the headset shows no RSA prompt, retry with
+`--reset-key`. The previous host key is retained under `~/.android`; other
+Android devices trusted by this computer will require authorization again.
+
+```bash
+bash scripts/authorize_quest.sh --reset-key
+```
+
 `adb` may also be selected with `QUEST3_ADB`, `ANDROID_HOME`,
 `ANDROID_SDK_ROOT`, or `--adb`.
 
